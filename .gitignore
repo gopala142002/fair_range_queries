@@ -1,4 +1,0 @@
-bin/*.o
-bin/main_*
-bin/convert_dataset
-*.exe
