@@ -1,0 +1,19 @@
+Weights of color:
+1.0 1.0 1.0 1.0 1.0
+
+Coverage:
+206 1246 785 231 40
+
+Difference:
+NaN NaN NaN NaN NaN
+NaN NaN NaN NaN NaN
+NaN NaN NaN NaN NaN
+25 NaN NaN NaN NaN
+NaN NaN NaN NaN NaN
+
+Ratio:
+NaN NaN NaN NaN NaN
+6.048543689320389 NaN 1.5872611464968154 NaN NaN
+3.8106796116504853 NaN NaN NaN NaN
+NaN NaN NaN NaN NaN
+NaN NaN NaN NaN NaN
