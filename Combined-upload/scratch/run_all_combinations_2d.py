@@ -1,4 +1,5 @@
 import csv
+import os
 import re
 import subprocess
 import sys
@@ -23,9 +24,23 @@ def main():
     weightA = 1.0
     weightB = 1.0
 
-    repetitions = 3
+    repetitions = int(os.getenv("BENCH_REPETITIONS", "3"))
 
-    modes = ["bfs","kd_opt",]
+    # Comma-separated base modes, for example:
+    # BENCH_MODES=kd_opt
+    # BENCH_MODES=bfs,kd_opt
+    modes = [
+        m.strip()
+        for m in os.getenv("BENCH_MODES", "brute,bfs,kd_opt").split(",")
+        if m.strip()
+    ]
+
+    timeout_seconds = int(os.getenv("BENCH_TIMEOUT", "3600"))
+
+    # Brute force is intended mainly for small validation datasets.
+    # Set ALLOW_BRUTE_LARGE=1 only if you intentionally want brute on large n.
+    allow_brute_large = os.getenv("ALLOW_BRUTE_LARGE", "0") == "1"
+    brute_max_n = int(os.getenv("BRUTE_MAX_N", "500"))
 
     combinations = [
         (True, False, False),    
@@ -62,8 +77,10 @@ def main():
     csv_filename = (
         project_root
         / "scratch"
-        / "combinations_result_2d.csv"
+        / "combinations_result_2d_all_modes.csv"
     )
+
+    resume = os.getenv("BENCH_RESUME", "1") != "0"
 
     if not dataset_path.exists():
         print(
@@ -150,12 +167,36 @@ def main():
     )
 
 
-    with open(csv_filename,"w",newline="",) as f:
+    completed_keys = set()
+
+    if resume and csv_filename.exists():
+        with open(csv_filename, "r", newline="") as existing:
+            reader = csv.DictReader(existing)
+            for row in reader:
+                completed_keys.add((
+                    row.get("mode", ""),
+                    row.get("fairness_combination", ""),
+                    row.get("epsilon", ""),
+                    row.get("delta", ""),
+                    row.get("query_id", ""),
+                ))
+
+        print(
+            f"Resume enabled: {len(completed_keys)} completed rows found.",
+            flush=True,
+        )
+
+    file_mode = "a" if resume and csv_filename.exists() else "w"
+
+    with open(csv_filename, file_mode, newline="", buffering=1) as f:
         writer = csv.DictWriter(
             f,
             fieldnames=headers,
         )
-        writer.writeheader()
+
+        if file_mode == "w":
+            writer.writeheader()
+            f.flush()
         for(has_diff,has_ratio,has_cov,) in combinations:
             if has_diff:
                 eps_to_test = epsilons
@@ -188,8 +229,9 @@ def main():
             for epsilon in eps_to_test:
                 for delta in del_to_test:
                     print(
-                        f"\nRunning Combination: "
-                        f"{fair_combo}"
+                        f"\nRunning Combination: {fair_combo}, "
+                        f"epsilon={epsilon}, delta={delta}",
+                        flush=True,
                     )
                     input_data = build_input(
                         queries=queries,
@@ -206,15 +248,36 @@ def main():
                     )
 
                     for mode in modes:
+                        if (
+                            mode == "brute"
+                            and n_rows > brute_max_n
+                            and not allow_brute_large
+                        ):
+                            print(
+                                f"SKIP brute: n={n_rows} exceeds "
+                                f"BRUTE_MAX_N={brute_max_n}. "
+                                f"Use ALLOW_BRUTE_LARGE=1 to override.",
+                                flush=True,
+                            )
+                            continue
+
                         if has_cov:
-                            if mode == "bfs":
-                                run_mode = ("bfs_cov")
-                            else:
-                                run_mode = ("kd_opt_cov")
+                            coverage_mode_map = {
+                                "brute": "brute_cov",
+                                "bfs": "bfs_cov",
+                                "kd_opt": "kd_opt_cov",
+                            }
+
+                            if mode not in coverage_mode_map:
+                                raise ValueError(
+                                    f"Unsupported base mode for coverage: {mode}"
+                                )
+
+                            run_mode = coverage_mode_map[mode]
                         else:
                             run_mode = mode
 
-                        print(f"--- Running "f"{run_mode} ---")
+                        print(f"--- Running {run_mode} ---", flush=True)
                         cmd = [str(executable),str(dataset_path),num_colors,dim_x,dim_y,run_mode,]
                         build_times = []
                         query_times = [[] for _ in queries]
@@ -231,11 +294,11 @@ def main():
                                         input=input_data,
                                         capture_output=True,
                                         text=True,
-                                        timeout=3600,
+                                        timeout=timeout_seconds,
                                     )
                                 )
                             except (subprocess.TimeoutExpired):
-                                print(f"TIMEOUT: " f"{run_mode}")
+                                print(f"TIMEOUT: {run_mode}", flush=True)
                                 continue
                             if result.returncode != 0:
                                 print(f"Error running "f"{run_mode}:")
@@ -257,7 +320,7 @@ def main():
                                     query_results[q_idx] = results[q_idx]
 
                         if success_runs == 0:
-                            print(f"No successful runs "f"for {run_mode}")
+                            print(f"No successful runs for {run_mode}", flush=True)
                             continue
 
                         if build_times:
@@ -266,6 +329,21 @@ def main():
                             avg_build = None
 
                         for q_idx, q in enumerate(queries):
+                            row_key = (
+                                run_mode,
+                                fair_combo,
+                                str(epsilon),
+                                str(delta),
+                                q["query_id"],
+                            )
+
+                            if row_key in completed_keys:
+                                print(
+                                    f"SKIP completed: {row_key}",
+                                    flush=True,
+                                )
+                                continue
+
                             times = query_times[q_idx]
                             q_res = query_results[q_idx]
 
@@ -333,9 +411,20 @@ def main():
 
                             writer.writerow(row)
                             f.flush()
+                            completed_keys.add(row_key)
+
+                            print(
+                                f"SAVED: mode={run_mode} "
+                                f"combo={fair_combo} "
+                                f"eps={epsilon} delta={delta} "
+                                f"query={q['query_id']} "
+                                f"avg_ms={avg_q_str} "
+                                f"similarity={row['similarity']}",
+                                flush=True,
+                            )
 
 
-    print(f"\nDone. Results saved to "f"{csv_filename}")
+    print(f"\nDone. Results saved to {csv_filename}", flush=True)
 
 
 def read_points(dataset_path,n_rows,dim_x,dim_y,):

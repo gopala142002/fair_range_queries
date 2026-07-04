@@ -415,83 +415,77 @@ optional<Result2D> queryBestKD_opt_cov_2d(RawData2D &raw,double qX_min,double qX
         }
     };
 
-    // Outer X search
+    // ---------------------------------------------------------
+    // Candidate-based X boundary search.
+    //
+    // Instead of enumerating every possible X boundary, test
+    // geometrically spaced boundaries around the original query.
+    // This keeps the coverage KD search compatible with the
+    // benchmark-scale candidate strategy used by kd_opt.
+    // ---------------------------------------------------------
 
-    // Phase 1:
-    // X_L expands left
+    vector<int> leftCandidates;
+    vector<int> rightCandidates;
 
-    for (int X_L = qL_X;X_L >= 0;--X_L)
+    // Original query boundaries.
+    leftCandidates.push_back(qL_X);
+    rightCandidates.push_back(qR_X);
+
+    // Generate geometrically increasing offsets.
+    for (long long step = 1; step < n_total; step *= 2)
     {
-        if (X_L < qL_X && getUB1(X_L,qR_X) <= bestT)
+        // Left boundary expansion and contraction.
+        leftCandidates.push_back(
+            max(0, qL_X - static_cast<int>(step))
+        );
+
+        leftCandidates.push_back(
+            min(qR_X, qL_X + static_cast<int>(step))
+        );
+
+        // Right boundary expansion and contraction.
+        rightCandidates.push_back(
+            min(n_total - 1, qR_X + static_cast<int>(step))
+        );
+
+        rightCandidates.push_back(
+            max(qL_X, qR_X - static_cast<int>(step))
+        );
+    }
+
+    // Sort and remove duplicate candidate boundaries.
+    sort(leftCandidates.begin(), leftCandidates.end());
+    leftCandidates.erase(
+        unique(leftCandidates.begin(), leftCandidates.end()),
+        leftCandidates.end()
+    );
+
+    sort(rightCandidates.begin(), rightCandidates.end());
+    rightCandidates.erase(
+        unique(rightCandidates.begin(), rightCandidates.end()),
+        rightCandidates.end()
+    );
+
+    // Evaluate the original query X-range first.
+    // This provides an initial feasible score for upper-bound pruning.
+    evaluateXRange(qL_X, qR_X);
+
+    // Evaluate candidate X-range pairs.
+    for (int X_L : leftCandidates)
+    {
+        for (int X_R : rightCandidates)
         {
-            break;
-        }
+            if (X_L > X_R)
+                continue;
 
-        // Expand X_R right
+            if (getUB(X_L, X_R) <= bestT)
+                continue;
 
-        for (int X_R = qR_X;X_R < n_total;++X_R)
-        {
-            if (getUB(X_L,X_R) <= bestT)
-            {
-                break;
-            }
-            evaluateXRange(X_L,X_R);
-        }
-
-        // Contract X_R left
-
-        for (int X_R = qR_X - 1;
-        X_R >= X_L;
-        --X_R)
-        {
-            if (getUB(
-            X_L,
-            X_R
-            ) <= bestT)
-            {
-                break;
-            }
-
-            evaluateXRange(
-            X_L,
-            X_R
-            );
+            evaluateXRange(X_L, X_R);
         }
     }
 
-    // Phase 2:
-    // X_L contracts inward
-
-    for (int X_L = qL_X + 1;X_L <= qR_X;++X_L)
-    {
-        if (getUB2(X_L,n_total - 1) <= bestT)
-        {
-            break;
-        }
-
-        // Expand X_R right
-        for (int X_R =max(X_L, qR_X);X_R < n_total;++X_R)
-        {
-            if (getUB(X_L,X_R) <= bestT)
-            {
-                break;
-            }
-            evaluateXRange(X_L,X_R);
-        }
-
-        // Contract X_R left
-
-        for (int X_R =min(n_total - 1,qR_X - 1);X_R >= X_L;--X_R)
-        {
-            if (getUB(X_L,X_R) <= bestT)
-            {
-                break;
-            }
-            evaluateXRange(X_L,X_R);
-        }
-    }
-
-    if(bestT < 0.0)
+    if (bestT < 0.0)
         return nullopt;
 
     return bestRes;

@@ -119,6 +119,8 @@ optional<Result2D> queryBestKD_opt_2d(
 
     // Evaluates one fixed X-range [X_L, X_R].
     // Inside this X-slab, the algorithm searches for a fair Y-range.
+
+
     auto evaluateXRange = [&](int X_L, int X_R) 
     {
         // Collect points belonging to current X-slab.
@@ -433,55 +435,72 @@ optional<Result2D> queryBestKD_opt_2d(
         }
     };
 
-    // First X search direction:
-    // move left boundary outward from original query X-range.
-    for (int X_L = qL_X; X_L >= 0; --X_L) 
+
+
+    // ---------------------------------------------------------
+    // Candidate-based X boundary search.
+    //
+    // Instead of enumerating every possible X boundary, test
+    // geometrically spaced boundaries around the original query.
+    // This is an approximate diagnostic search.
+    // ---------------------------------------------------------
+
+    vector<int> leftCandidates;
+    vector<int> rightCandidates;
+
+    // Original query boundaries.
+    leftCandidates.push_back(qL_X);
+    rightCandidates.push_back(qR_X);
+
+    // Generate geometrically increasing offsets.
+    for (long long step = 1; step < n_total; step *= 2)
     {
-        // Stop if further left expansion cannot improve bestT.
-        if (X_L < qL_X && getUB1(X_L, qR_X) <= bestT) 
-            break;  
+        // Left boundary expansion and contraction.
+        leftCandidates.push_back(
+            max(0, qL_X - static_cast<int>(step))
+        );
 
-        // Move right boundary outward.
-        for (int X_R = qR_X; X_R < n_total; ++X_R) 
-        {
-            if (getUB(X_L, X_R) <= bestT) 
-                break;
+        leftCandidates.push_back(
+            min(qR_X, qL_X + static_cast<int>(step))
+        );
 
-            evaluateXRange(X_L, X_R);
-        }
+        // Right boundary expansion and contraction.
+        rightCandidates.push_back(
+            min(n_total - 1, qR_X + static_cast<int>(step))
+        );
 
-        // Move right boundary inward.
-        for (int X_R = qR_X - 1; X_R >= X_L; --X_R) 
-        {
-            if (getUB(X_L, X_R) <= bestT) 
-                break;
-
-            evaluateXRange(X_L, X_R);
-        }
+        rightCandidates.push_back(
+            max(qL_X, qR_X - static_cast<int>(step))
+        );
     }
 
-    // Second X search direction:
-    // move left boundary inside original query X-range.
-    for (int X_L = qL_X + 1; X_L <= qR_X; ++X_L) 
+    // Sort and remove duplicate candidate boundaries.
+    sort(leftCandidates.begin(), leftCandidates.end());
+    leftCandidates.erase(
+        unique(leftCandidates.begin(), leftCandidates.end()),
+        leftCandidates.end()
+    );
+
+    sort(rightCandidates.begin(), rightCandidates.end());
+    rightCandidates.erase(
+        unique(rightCandidates.begin(), rightCandidates.end()),
+        rightCandidates.end()
+    );
+
+    // Evaluate the original query X-range first.
+    // This provides an initial feasible score for upper-bound pruning.
+    evaluateXRange(qL_X, qR_X);
+
+    // Evaluate candidate X-range pairs.
+    for (int X_L : leftCandidates)
     {
-        // Stop if excluding more query points cannot improve bestT.
-        if (getUB2(X_L, n_total - 1) <= bestT) 
-            break;  
-
-        // Move right boundary outward.
-        for (int X_R = max(X_L, qR_X); X_R < n_total; ++X_R) 
+        for (int X_R : rightCandidates)
         {
-            if (getUB(X_L, X_R) <= bestT) 
-                break;
+            if (X_L > X_R)
+                continue;
 
-            evaluateXRange(X_L, X_R);
-        }
-
-        // Move right boundary inward.
-        for (int X_R = min(n_total - 1, qR_X - 1); X_R >= X_L; --X_R) 
-        {
-            if (getUB(X_L, X_R) <= bestT) 
-                break;
+            if (getUB(X_L, X_R) <= bestT)
+                continue;
 
             evaluateXRange(X_L, X_R);
         }

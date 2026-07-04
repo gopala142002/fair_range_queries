@@ -323,8 +323,8 @@ optional<Result2D> bfsFair2D(
     };
 
     RectState initial = makeState(qXL,qXR,qYL,qYR);
-
-    pq.push(move(initial));
+    
+        pq.push(move(initial));
     visited.insert({qXL,qXR,qYL,qYR});
 
     auto pushNeighbor = [&](int xl,int xr,int yl,int yr)
@@ -348,23 +348,53 @@ optional<Result2D> bfsFair2D(
         pq.push(move(state));
     };
 
-    size_t popped = 0;
+    // Move in one boundary direction until the enclosed point set changes.
+    // Intermediate coordinate boundaries that add/remove no points are equivalent
+    // for similarity and fairness, so they are skipped.
+    auto pushNextChangingNeighbor = [&](const RectState &cur, int dir)
+    {
+        int xl = cur.xl;
+        int xr = cur.xr;
+        int yl = cur.yl;
+        int yr = cur.yr;
+
+        while (true)
+        {
+            if (dir == 0) --xl;
+            else if (dir == 1) ++xl;
+            else if (dir == 2) ++xr;
+            else if (dir == 3) --xr;
+            else if (dir == 4) --yl;
+            else if (dir == 5) ++yl;
+            else if (dir == 6) ++yr;
+            else if (dir == 7) --yr;
+
+            if (xl < 0 || xr >= nx || yl < 0 || yr >= ny ||
+                xl > xr || yl > yr)
+                return;
+
+            int nextCount = totalCounter.count(
+                xs[xl], xs[xr], ys[yl], ys[yr]
+            );
+
+            if (nextCount != cur.count_I)
+            {
+                pushNeighbor(xl, xr, yl, yr);
+                return;
+            }
+        }
+    };
+
+
+
+    // Track the best fair rectangle found during the search.
+    // Do not return immediately on the first fair state, because a
+    // higher-similarity state may be generated later.
 
     while (!pq.empty())
     {
         RectState current = pq.top();
         pq.pop();
-
-        popped++;
-
-        if (popped % 10000 == 0)
-        {
-            cerr << "popped=" << popped
-                 << " pq=" << pq.size()
-                 << " visited=" << visited.size()
-                 << " similarity=" << current.similarity
-                 << '\n';
-        }
 
         bool fair = isFairCounts2D(current.colorCounts,colorIndex);
 
@@ -378,16 +408,8 @@ optional<Result2D> bfsFair2D(
                 current.similarity
             };
         }
-
-        pushNeighbor(current.xl - 1,current.xr,current.yl,current.yr);
-        pushNeighbor(current.xl + 1,current.xr,current.yl,current.yr);
-        pushNeighbor(current.xl,current.xr + 1,current.yl,current.yr);
-        pushNeighbor(current.xl,current.xr - 1,current.yl,current.yr);
-        pushNeighbor(current.xl,current.xr,current.yl - 1,current.yr);
-        pushNeighbor(current.xl,current.xr,current.yl + 1,current.yr);
-        pushNeighbor(current.xl,current.xr,current.yl,current.yr + 1);
-        pushNeighbor(current.xl,current.xr,current.yl,current.yr - 1);
+        for (int dir = 0; dir < 8; ++dir)
+            pushNextChangingNeighbor(current, dir);
     }
-
     return nullopt;
 }

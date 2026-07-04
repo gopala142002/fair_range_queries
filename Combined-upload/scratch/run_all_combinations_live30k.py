@@ -36,7 +36,7 @@ EXECUTABLE = (
 NUM_COLORS = 3
 
 DIM_X = 0
-DIM_Y = 1
+DIM_Y = 2
 
 ALPHA = 0.5
 BETA = 0.5

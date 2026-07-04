@@ -364,23 +364,48 @@ optional<Result2D> bfsFairCov2D(
         pq.push(move(state));
     };
 
-    size_t popped = 0;
+    // Move one rectangle boundary until the enclosed point set changes.
+    // Coordinate positions that do not add or remove any point are skipped.
+    auto pushNextChangingNeighbor = [&](const RectState &cur,int dir)
+    {
+        int xl = cur.xl;
+        int xr = cur.xr;
+        int yl = cur.yl;
+        int yr = cur.yr;
+
+        while (true)
+        {
+            if (dir == 0) --xl;
+            else if (dir == 1) ++xl;
+            else if (dir == 2) ++xr;
+            else if (dir == 3) --xr;
+            else if (dir == 4) --yl;
+            else if (dir == 5) ++yl;
+            else if (dir == 6) ++yr;
+            else if (dir == 7) --yr;
+
+            if (xl < 0 || xr >= nx || yl < 0 || yr >= ny ||
+                xl > xr || yl > yr)
+            {
+                return;
+            }
+
+            int nextCount = totalCounter.count(
+                xs[xl],xs[xr],ys[yl],ys[yr]
+            );
+
+            if (nextCount != cur.count_I)
+            {
+                pushNeighbor(xl,xr,yl,yr);
+                return;
+            }
+        }
+    };
 
     while (!pq.empty())
     {
         RectState current = pq.top();
         pq.pop();
-
-        popped++;
-
-        if (popped % 10000 == 0)
-        {
-            cerr << "popped=" << popped
-                 << " pq=" << pq.size()
-                 << " visited=" << visited.size()
-                 << " similarity=" << current.similarity
-                 << '\n';
-        }
 
         bool fair = isFairCounts2D(current.colorCounts,colorIndex);
 
@@ -397,14 +422,10 @@ optional<Result2D> bfsFairCov2D(
             };
         }
 
-        pushNeighbor(current.xl - 1,current.xr,current.yl,current.yr);
-        pushNeighbor(current.xl + 1,current.xr,current.yl,current.yr);
-        pushNeighbor(current.xl,current.xr + 1,current.yl,current.yr);
-        pushNeighbor(current.xl,current.xr - 1,current.yl,current.yr);
-        pushNeighbor(current.xl,current.xr,current.yl - 1,current.yr);
-        pushNeighbor(current.xl,current.xr,current.yl + 1,current.yr);
-        pushNeighbor(current.xl,current.xr,current.yl,current.yr + 1);
-        pushNeighbor(current.xl,current.xr,current.yl,current.yr - 1);
+        for (int dir = 0;dir < 8;++dir)
+        {
+            pushNextChangingNeighbor(current,dir);
+        }
     }
 
     return nullopt;

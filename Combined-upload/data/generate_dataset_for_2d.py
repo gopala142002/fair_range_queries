@@ -1,8 +1,8 @@
 INPUT_FILE = "data/live_l2_5d_30k.txt"
 OUTPUT_FILE = "data/live_l2_2d_30k.txt"
 
-DIM_X = 0
-DIM_Y = 1
+DIM_X = 2
+DIM_Y = 4
 
 
 def main():
