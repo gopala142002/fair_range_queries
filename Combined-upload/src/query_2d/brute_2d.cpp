@@ -20,7 +20,7 @@ optional<Result2D> brute_force_2d(
     double qY_min, double qY_max,
     double alpha, double beta) {
 
-    auto search_start_time = std::chrono::high_resolution_clock::now();
+    // auto search_start_time = std::chrono::high_resolution_clock::now();
     int n = raw.pts.size();
     if (n == 0) return nullopt;
 
