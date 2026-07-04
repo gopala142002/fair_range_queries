@@ -2,331 +2,219 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 #include <queue>
-#include <set>
-#include <tuple>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 using namespace std;
 
-
-// ============================================================
-// 2D Tversky similarity
-// Same definition used by brute_2d.cpp and kd_tree_opt_2d.cpp
-// ============================================================
-
-static double tverskyByCount2D(
-    int count_I,
-    int count_O,
-    int count_inter,
-    double alpha,
-    double beta)
+// Computes Tversky similarity from point counts.
+static double tverskyByCount2D(int count_I,int count_O,int count_inter,double alpha,double beta)
 {
     double inter = count_inter;
     double onlyA = count_I - inter;
     double onlyB = count_O - inter;
-
-    double denom =
-        inter +
-        alpha * onlyA +
-        beta * onlyB;
-
-    return (denom == 0.0)
-        ? 0.0
-        : inter / denom;
+    double denom = inter + alpha * onlyA + beta * onlyB;
+    return denom == 0.0 ? 0.0 : inter / denom;
 }
 
+// Static 2D orthogonal range counter.
+// Points are sorted by x. Each segment-tree node stores sorted y-values.
+class RangeCounter2D
+{
+private:
+    vector<RawPoint> points;
+    vector<vector<double>> tree;
 
-// ============================================================
-// BFS state
-//
-// Rectangle:
-//
-// X = [xs[xl], xs[xr]]
-// Y = [ys[yl], ys[yr]]
-// ============================================================
+    void build(int node,int left,int right)
+    {
+        if (left == right)
+        {
+            tree[node].push_back(points[left].y);
+            return;
+        }
 
-struct RectState {
-    double similarity;
+        int mid = left + (right - left) / 2;
+        build(node * 2,left,mid);
+        build(node * 2 + 1,mid + 1,right);
 
-    int xl;
-    int xr;
+        const auto &a = tree[node * 2];
+        const auto &b = tree[node * 2 + 1];
 
-    int yl;
-    int yr;
+        tree[node].resize(a.size() + b.size());
+        merge(a.begin(),a.end(),b.begin(),b.end(),tree[node].begin());
+    }
+
+    int queryNode(int node,int left,int right,int ql,int qr,double y_min,double y_max) const
+    {
+        if (qr < left || right < ql)
+            return 0;
+
+        if (ql <= left && right <= qr)
+        {
+            const auto &ys = tree[node];
+            auto lo = lower_bound(ys.begin(),ys.end(),y_min);
+            auto hi = upper_bound(ys.begin(),ys.end(),y_max);
+            return static_cast<int>(hi - lo);
+        }
+
+        int mid = left + (right - left) / 2;
+
+        return queryNode(node * 2,left,mid,ql,qr,y_min,y_max)
+             + queryNode(node * 2 + 1,mid + 1,right,ql,qr,y_min,y_max);
+    }
+
+public:
+    RangeCounter2D() = default;
+
+    explicit RangeCounter2D(const vector<RawPoint> &input)
+    {
+        points = input;
+
+        sort(points.begin(),points.end(),[](const RawPoint &a,const RawPoint &b)
+        {
+            if (a.x != b.x)
+                return a.x < b.x;
+            return a.y < b.y;
+        });
+
+        if (!points.empty())
+        {
+            tree.resize(points.size() * 4);
+            build(1,0,static_cast<int>(points.size()) - 1);
+        }
+    }
+
+    int count(double x_min,double x_max,double y_min,double y_max) const
+    {
+        if (points.empty() || x_min > x_max || y_min > y_max)
+            return 0;
+
+        auto leftIt = lower_bound(points.begin(),points.end(),x_min,[](const RawPoint &p,double value)
+        {
+            return p.x < value;
+        });
+
+        auto rightIt = upper_bound(points.begin(),points.end(),x_max,[](double value,const RawPoint &p)
+        {
+            return value < p.x;
+        });
+
+        int left = static_cast<int>(leftIt - points.begin());
+        int right = static_cast<int>(rightIt - points.begin()) - 1;
+
+        if (left > right)
+            return 0;
+
+        return queryNode(1,0,static_cast<int>(points.size()) - 1,left,right,y_min,y_max);
+    }
 };
 
+struct RectState
+{
+    double similarity;
+    int xl;
+    int xr;
+    int yl;
+    int yr;
+    int count_I;
+    int count_inter;
+    vector<int> colorCounts;
+};
 
-// ============================================================
-// Priority queue comparator
-//
-// Same philosophy as 1D BFS:
-//
-// 1. Higher similarity first
-// 2. Smaller boundary-index span first
-// 3. Lexicographic tie-breaking
-// ============================================================
-
-struct RectCompare {
-
-    bool operator()(
-        const RectState &a,
-        const RectState &b) const
+struct RectCompare
+{
+    bool operator()(const RectState &a,const RectState &b) const
     {
         if (a.similarity != b.similarity)
             return a.similarity < b.similarity;
 
-        int spanA =
-            (a.xr - a.xl) +
-            (a.yr - a.yl);
-
-        int spanB =
-            (b.xr - b.xl) +
-            (b.yr - b.yl);
+        int spanA = (a.xr - a.xl) + (a.yr - a.yl);
+        int spanB = (b.xr - b.xl) + (b.yr - b.yl);
 
         if (spanA != spanB)
             return spanA > spanB;
-
         if (a.xl != b.xl)
             return a.xl > b.xl;
-
         if (a.xr != b.xr)
             return a.xr > b.xr;
-
         if (a.yl != b.yl)
             return a.yl > b.yl;
-
         return a.yr > b.yr;
     }
 };
 
-
-// ============================================================
-// Rectangle key for visited set
-// ============================================================
-
-struct RectKey {
-
+struct RectKey
+{
     int xl;
     int xr;
     int yl;
     int yr;
 
-    bool operator==(const RectKey &other) const {
-        return
-            xl == other.xl &&
-            xr == other.xr &&
-            yl == other.yl &&
-            yr == other.yr;
+    bool operator==(const RectKey &other) const
+    {
+        return xl == other.xl && xr == other.xr && yl == other.yl && yr == other.yr;
     }
 };
 
-
-struct RectKeyHash {
-
-    size_t operator()(const RectKey &r) const {
-
+struct RectKeyHash
+{
+    size_t operator()(const RectKey &r) const
+    {
         size_t h = 17;
-
         h = h * 31 + hash<int>{}(r.xl);
         h = h * 31 + hash<int>{}(r.xr);
         h = h * 31 + hash<int>{}(r.yl);
         h = h * 31 + hash<int>{}(r.yr);
-
         return h;
     }
 };
 
-
-// ============================================================
-// Check whether point lies inside rectangle
-// ============================================================
-
-static inline bool insideRectangle(
-    const RawPoint &p,
-    double x_min,
-    double x_max,
-    double y_min,
-    double y_max)
+static bool isFairCounts2D(const vector<int> &counts,const unordered_map<string,int> &colorIndex)
 {
-    return
-        p.x >= x_min &&
-        p.x <= x_max &&
-        p.y >= y_min &&
-        p.y <= y_max;
-}
+    auto getCount = [&](const string &color)
+    {
+        auto it = colorIndex.find(color);
+        return it == colorIndex.end() ? 0 : counts[it->second];
+    };
 
-
-// ============================================================
-// Evaluate rectangle
-//
-// Computes:
-//
-// count_I       = points in candidate rectangle
-// count_inter   = points in candidate AND original query
-// color counts  = used for fairness check
-// ============================================================
-
-static void evaluateRectangle(
-    const RawData2D &raw,
-
-    double x_min,
-    double x_max,
-    double y_min,
-    double y_max,
-
-    double qX_min,
-    double qX_max,
-    double qY_min,
-    double qY_max,
-
-    int &count_I,
-    int &count_inter,
-
-    unordered_map<string, int> &colorCounts)
-{
-    count_I = 0;
-    count_inter = 0;
-
-    colorCounts.clear();
-
-    for (const auto &p : raw.pts) {
-
-        if (!insideRectangle(
-                p,
-                x_min,
-                x_max,
-                y_min,
-                y_max))
-        {
-            continue;
-        }
-
-        count_I++;
-
-        colorCounts[p.color]++;
-
-        if (insideRectangle(
-                p,
-                qX_min,
-                qX_max,
-                qY_min,
-                qY_max))
-        {
-            count_inter++;
-        }
-    }
-}
-
-
-// ============================================================
-// Fairness check from color counts
-//
-// Same equations used by common.cpp / kd_tree_opt_2d.cpp
-// ============================================================
-
-static bool isFairCounts2D(
-    const unordered_map<string, int> &counts)
-{
-    // --------------------------------------------------------
-    // Difference constraints
-    // --------------------------------------------------------
-
-    for (const auto &config : diffPairs) {
-
-        int countA = 0;
-        int countB = 0;
-
-        auto itA = counts.find(config.colorA);
-
-        if (itA != counts.end())
-            countA = itA->second;
-
-
-        auto itB = counts.find(config.colorB);
-
-        if (itB != counts.end())
-            countB = itB->second;
-
-
-        double diff =
-            config.weightA * countA -
-            config.weightB * countB;
-
+    for (const auto &config : diffPairs)
+    {
+        double diff = config.weightA * getCount(config.colorA)
+                    - config.weightB * getCount(config.colorB);
 
         if (abs(diff) > config.epsilon)
             return false;
     }
 
+    for (const auto &config : ratioPairs)
+    {
+        int countA = getCount(config.colorA);
+        int countB = getCount(config.colorB);
 
-    // --------------------------------------------------------
-    // Ratio constraints
-    // --------------------------------------------------------
+        double cr = config.weightA * countA
+                  - config.weightB * countB * (1.0 + config.delta);
 
-    for (const auto &config : ratioPairs) {
+        double cb = config.weightB * countB * (1.0 - config.delta)
+                  - config.weightA * countA;
 
-        int countA = 0;
-        int countB = 0;
-
-
-        auto itA = counts.find(config.colorA);
-
-        if (itA != counts.end())
-            countA = itA->second;
-
-
-        auto itB = counts.find(config.colorB);
-
-        if (itB != counts.end())
-            countB = itB->second;
-
-
-        double cr =
-            config.weightA * countA
-            -
-            config.weightB *
-            countB *
-            (1.0 + config.delta);
-
-
-        double cb =
-            config.weightB *
-            countB *
-            (1.0 - config.delta)
-            -
-            config.weightA *
-            countA;
-
-
-        if (cr > 0.0)
-            return false;
-
-        if (cb > 0.0)
+        if (cr > 0.0 || cb > 0.0)
             return false;
     }
-
 
     return true;
 }
 
 
-// ============================================================
-// Main BFS Fair 2D
-// ============================================================
 
 optional<Result2D> bfsFair2D(
     RawData2D &raw,
-
-    double qX_min,
-    double qX_max,
-
-    double qY_min,
-    double qY_max,
-
-    double alpha,
-    double beta)
+    double qX_min,double qX_max,
+    double qY_min,double qY_max,
+    double alpha,double beta)
 {
     int n = static_cast<int>(raw.pts.size());
 
@@ -334,13 +222,6 @@ optional<Result2D> bfsFair2D(
         return nullopt;
 
 
-    // ========================================================
-    // STEP 1
-    //
-    // Collect all distinct X and Y coordinates.
-    //
-    // Candidate boundaries always come from actual data points.
-    // ========================================================
 
     vector<double> xs;
     vector<double> ys;
@@ -348,428 +229,165 @@ optional<Result2D> bfsFair2D(
     xs.reserve(n);
     ys.reserve(n);
 
-
-    for (const auto &p : raw.pts) {
-
+    for (const auto &p : raw.pts)
+    {
         xs.push_back(p.x);
         ys.push_back(p.y);
     }
 
+    sort(xs.begin(),xs.end());
+    xs.erase(unique(xs.begin(),xs.end()),xs.end());
 
-    sort(xs.begin(), xs.end());
-
-    xs.erase(
-        unique(xs.begin(), xs.end()),
-        xs.end()
-    );
-
-
-    sort(ys.begin(), ys.end());
-
-    ys.erase(
-        unique(ys.begin(), ys.end()),
-        ys.end()
-    );
-
+    sort(ys.begin(),ys.end());
+    ys.erase(unique(ys.begin(),ys.end()),ys.end());
 
     int nx = static_cast<int>(xs.size());
     int ny = static_cast<int>(ys.size());
 
+    int qXL = static_cast<int>(lower_bound(xs.begin(),xs.end(),qX_min) - xs.begin());
+    int qXR = static_cast<int>(upper_bound(xs.begin(),xs.end(),qX_max) - xs.begin()) - 1;
+    int qYL = static_cast<int>(lower_bound(ys.begin(),ys.end(),qY_min) - ys.begin());
+    int qYR = static_cast<int>(upper_bound(ys.begin(),ys.end(),qY_max) - ys.begin()) - 1;
 
-    // ========================================================
-    // STEP 2
-    //
-    // Find initial rectangle corresponding to the input query.
-    // ========================================================
-
-    int qXL =
-        static_cast<int>(
-            lower_bound(
-                xs.begin(),
-                xs.end(),
-                qX_min
-            ) - xs.begin()
-        );
-
-
-    int qXR =
-        static_cast<int>(
-            upper_bound(
-                xs.begin(),
-                xs.end(),
-                qX_max
-            ) - xs.begin()
-        ) - 1;
-
-
-    int qYL =
-        static_cast<int>(
-            lower_bound(
-                ys.begin(),
-                ys.end(),
-                qY_min
-            ) - ys.begin()
-        );
-
-
-    int qYR =
-        static_cast<int>(
-            upper_bound(
-                ys.begin(),
-                ys.end(),
-                qY_max
-            ) - ys.begin()
-        ) - 1;
-
-
-    if (qXL >= nx ||
-        qXR < 0 ||
-        qYL >= ny ||
-        qYR < 0 ||
-        qXL > qXR ||
-        qYL > qYR)
+    if (qXL >= nx || qXR < 0 || qYL >= ny || qYR < 0 ||
+        qXL > qXR || qYL > qYR)
     {
         return nullopt;
     }
 
+    unordered_map<string,int> colorIndex;
+    vector<vector<RawPoint>> pointsByColor(raw.uniqueColorsList.size());
 
-    // ========================================================
-    // STEP 3
-    //
-    // Count |O|:
-    // number of points in original query rectangle.
-    // ========================================================
+    for (int i = 0;i < static_cast<int>(raw.uniqueColorsList.size());++i)
+        colorIndex[raw.uniqueColorsList[i]] = i;
 
-    int count_O = 0;
+    for (const auto &p : raw.pts)
+    {
+        auto it = colorIndex.find(p.color);
 
-
-    for (const auto &p : raw.pts) {
-
-        if (insideRectangle(
-                p,
-                qX_min,
-                qX_max,
-                qY_min,
-                qY_max))
-        {
-            count_O++;
-        }
+        if (it != colorIndex.end())
+            pointsByColor[it->second].push_back(p);
     }
 
+    // One counter for all points and one counter per color.
+    RangeCounter2D totalCounter(raw.pts);
+    vector<RangeCounter2D> colorCounters;
+    colorCounters.reserve(pointsByColor.size());
+
+    for (const auto &colorPoints : pointsByColor)
+        colorCounters.emplace_back(colorPoints);
+
+    int count_O = totalCounter.count(qX_min,qX_max,qY_min,qY_max);
 
     if (count_O == 0)
         return nullopt;
 
+    priority_queue<RectState,vector<RectState>,RectCompare> pq;
+    unordered_set<RectKey,RectKeyHash> visited;
 
-    // ========================================================
-    // STEP 4
-    //
-    // Priority queue and visited states.
-    // ========================================================
-
-    priority_queue<
-        RectState,
-        vector<RectState>,
-        RectCompare
-    > pq;
-
-
-    unordered_set<
-        RectKey,
-        RectKeyHash
-    > visited;
-
-
-    // Exact query rectangle has similarity 1.
-    pq.push({
-        1.0,
-        qXL,
-        qXR,
-        qYL,
-        qYR
-    });
-
-
-    visited.insert({
-        qXL,
-        qXR,
-        qYL,
-        qYR
-    });
-
-
-    // ========================================================
-    // Helper to generate and insert a neighbor.
-    // ========================================================
-
-    auto pushNeighbor =
-        [&](int xl,
-            int xr,
-            int yl,
-            int yr)
+    auto makeState = [&](int xl,int xr,int yl,int yr) -> RectState
     {
-        // Invalid rectangle.
-        if (xl < 0 ||
-            xr >= nx ||
-            yl < 0 ||
-            yr >= ny ||
-            xl > xr ||
-            yl > yr)
+        double x_min = xs[xl];
+        double x_max = xs[xr];
+        double y_min = ys[yl];
+        double y_max = ys[yr];
+
+        int count_I = totalCounter.count(x_min,x_max,y_min,y_max);
+
+        double ix_min = max(x_min,qX_min);
+        double ix_max = min(x_max,qX_max);
+        double iy_min = max(y_min,qY_min);
+        double iy_max = min(y_max,qY_max);
+
+        int count_inter = 0;
+
+        if (ix_min <= ix_max && iy_min <= iy_max)
+            count_inter = totalCounter.count(ix_min,ix_max,iy_min,iy_max);
+
+        vector<int> counts(colorCounters.size(),0);
+
+        for (int c = 0;c < static_cast<int>(colorCounters.size());++c)
+            counts[c] = colorCounters[c].count(x_min,x_max,y_min,y_max);
+
+        double similarity = tverskyByCount2D(
+            count_I,count_O,count_inter,alpha,beta
+        );
+
+        return {
+            similarity,
+            xl,xr,yl,yr,
+            count_I,
+            count_inter,
+            move(counts)
+        };
+    };
+
+    RectState initial = makeState(qXL,qXR,qYL,qYR);
+
+    pq.push(move(initial));
+    visited.insert({qXL,qXR,qYL,qYR});
+
+    auto pushNeighbor = [&](int xl,int xr,int yl,int yr)
+    {
+        if (xl < 0 || xr >= nx || yl < 0 || yr >= ny ||
+            xl > xr || yl > yr)
         {
             return;
         }
 
+        RectKey key{xl,xr,yl,yr};
 
-        RectKey key{
-            xl,
-            xr,
-            yl,
-            yr
-        };
-
-
-        if (visited.find(key) != visited.end())
+        if (!visited.insert(key).second)
             return;
 
+        RectState state = makeState(xl,xr,yl,yr);
 
-        visited.insert(key);
-
-
-        int count_I = 0;
-        int count_inter = 0;
-
-        unordered_map<string, int> colorCounts;
-
-
-        evaluateRectangle(
-            raw,
-
-            xs[xl],
-            xs[xr],
-
-            ys[yl],
-            ys[yr],
-
-            qX_min,
-            qX_max,
-
-            qY_min,
-            qY_max,
-
-            count_I,
-            count_inter,
-
-            colorCounts
-        );
-
-
-        // Empty candidate rectangle is not useful.
-        if (count_I == 0)
+        if (state.count_I == 0)
             return;
 
-
-        double similarity =
-            tverskyByCount2D(
-                count_I,
-                count_O,
-                count_inter,
-                alpha,
-                beta
-            );
-
-
-        pq.push({
-            similarity,
-            xl,
-            xr,
-            yl,
-            yr
-        });
+        pq.push(move(state));
     };
 
+    size_t popped = 0;
 
-    // ========================================================
-    // STEP 5
-    //
-    // Best-first search.
-    //
-    // Equivalent idea to 1D BFS:
-    //
-    // 1D:
-    //      [L,R]
-    //
-    //      L expand
-    //      L contract
-    //      R expand
-    //      R contract
-    //
-    //
-    // 2D:
-    //      [XL,XR] x [YL,YR]
-    //
-    //      XL expand / contract
-    //      XR expand / contract
-    //      YL expand / contract
-    //      YR expand / contract
-    // ========================================================
-
-    while (!pq.empty()) {
-
+    while (!pq.empty())
+    {
         RectState current = pq.top();
         pq.pop();
 
+        popped++;
 
-        double x_min = xs[current.xl];
-        double x_max = xs[current.xr];
+        if (popped % 10000 == 0)
+        {
+            cerr << "popped=" << popped
+                 << " pq=" << pq.size()
+                 << " visited=" << visited.size()
+                 << " similarity=" << current.similarity
+                 << '\n';
+        }
 
-        double y_min = ys[current.yl];
-        double y_max = ys[current.yr];
+        bool fair = isFairCounts2D(current.colorCounts,colorIndex);
 
-
-        // ----------------------------------------------------
-        // Compute color counts for fairness.
-        // ----------------------------------------------------
-
-        int count_I = 0;
-        int count_inter = 0;
-
-        unordered_map<string, int> colorCounts;
-
-
-        evaluateRectangle(
-            raw,
-
-            x_min,
-            x_max,
-
-            y_min,
-            y_max,
-
-            qX_min,
-            qX_max,
-
-            qY_min,
-            qY_max,
-
-            count_I,
-            count_inter,
-
-            colorCounts
-        );
-
-
-        // ----------------------------------------------------
-        // Same behavior as 1D BFS:
-        //
-        // Return the first fair candidate popped from the
-        // similarity-priority queue.
-        // ----------------------------------------------------
-
-        if (isFairCounts2D(colorCounts)) {
-
+        if (fair)
+        {
             return Result2D{
-                x_min,
-                x_max,
-                y_min,
-                y_max,
+                xs[current.xl],
+                xs[current.xr],
+                ys[current.yl],
+                ys[current.yr],
                 current.similarity
             };
         }
 
-
-        // ====================================================
-        // Generate 8 neighbors.
-        // ====================================================
-
-
-        // ----------------------------------------------------
-        // X-left boundary
-        // ----------------------------------------------------
-
-        // Expand left
-        pushNeighbor(
-            current.xl - 1,
-            current.xr,
-            current.yl,
-            current.yr
-        );
-
-
-        // Contract left
-        pushNeighbor(
-            current.xl + 1,
-            current.xr,
-            current.yl,
-            current.yr
-        );
-
-
-        // ----------------------------------------------------
-        // X-right boundary
-        // ----------------------------------------------------
-
-        // Expand right
-        pushNeighbor(
-            current.xl,
-            current.xr + 1,
-            current.yl,
-            current.yr
-        );
-
-
-        // Contract right
-        pushNeighbor(
-            current.xl,
-            current.xr - 1,
-            current.yl,
-            current.yr
-        );
-
-
-        // ----------------------------------------------------
-        // Y-lower boundary
-        // ----------------------------------------------------
-
-        // Expand downward
-        pushNeighbor(
-            current.xl,
-            current.xr,
-            current.yl - 1,
-            current.yr
-        );
-
-
-        // Contract upward
-        pushNeighbor(
-            current.xl,
-            current.xr,
-            current.yl + 1,
-            current.yr
-        );
-
-
-        // ----------------------------------------------------
-        // Y-upper boundary
-        // ----------------------------------------------------
-
-        // Expand upward
-        pushNeighbor(
-            current.xl,
-            current.xr,
-            current.yl,
-            current.yr + 1
-        );
-
-
-        // Contract downward
-        pushNeighbor(
-            current.xl,
-            current.xr,
-            current.yl,
-            current.yr - 1
-        );
+        pushNeighbor(current.xl - 1,current.xr,current.yl,current.yr);
+        pushNeighbor(current.xl + 1,current.xr,current.yl,current.yr);
+        pushNeighbor(current.xl,current.xr + 1,current.yl,current.yr);
+        pushNeighbor(current.xl,current.xr - 1,current.yl,current.yr);
+        pushNeighbor(current.xl,current.xr,current.yl - 1,current.yr);
+        pushNeighbor(current.xl,current.xr,current.yl + 1,current.yr);
+        pushNeighbor(current.xl,current.xr,current.yl,current.yr + 1);
+        pushNeighbor(current.xl,current.xr,current.yl,current.yr - 1);
     }
-
 
     return nullopt;
 }
