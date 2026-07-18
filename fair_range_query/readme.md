@@ -27,7 +27,7 @@ Together, these components provide both algorithmic and optimization-based appro
 
 Each component has its own dependencies, input formats, and execution instructions.
 
-* For **`Combined-upload/`**, refer to **`Combined-upload/README.md`**.
-* For **`mult-predicate/`**, refer to **`mult-predicate/README.md`**.
+* For **`single-predicate/`**, refer to **`single-predicate/README.md`**.
+* For **`multi-predicate/`**, refer to **`multi-predicate/README.md`**.
 
 Please follow the appropriate README for the component you wish to use.
