@@ -25,7 +25,7 @@ static double tverskyByCount2D(int count_I,int count_O,int count_inter,double al
 // Points are sorted by x. Each segment-tree node stores sorted y-values.
 class RangeCounter2D
 {
-private:
+    private:
     vector<RawPoint> points;
     vector<vector<double>> tree;
 
@@ -52,7 +52,6 @@ private:
     {
         if (qr < left || right < ql)
             return 0;
-
         if (ql <= left && right <= qr)
         {
             const auto &ys = tree[node];
@@ -60,14 +59,11 @@ private:
             auto hi = upper_bound(ys.begin(),ys.end(),y_max);
             return static_cast<int>(hi - lo);
         }
-
         int mid = left + (right - left) / 2;
-
-        return queryNode(node * 2,left,mid,ql,qr,y_min,y_max)
-             + queryNode(node * 2 + 1,mid + 1,right,ql,qr,y_min,y_max);
+        return queryNode(node * 2,left,mid,ql,qr,y_min,y_max) + queryNode(node * 2 + 1,mid + 1,right,ql,qr,y_min,y_max);
     }
 
-public:
+    public:
     RangeCounter2D() = default;
 
     explicit RangeCounter2D(const vector<RawPoint> &input)
@@ -183,8 +179,7 @@ static bool isFairCounts2D(const vector<int> &counts,const unordered_map<string,
 
     for (const auto &config : diffPairs)
     {
-        double diff = config.weightA * getCount(config.colorA)
-                    - config.weightB * getCount(config.colorB);
+        double diff = config.weightA * getCount(config.colorA) - config.weightB * getCount(config.colorB);
 
         if (abs(diff) > config.epsilon)
             return false;
@@ -195,11 +190,9 @@ static bool isFairCounts2D(const vector<int> &counts,const unordered_map<string,
         int countA = getCount(config.colorA);
         int countB = getCount(config.colorB);
 
-        double cr = config.weightA * countA
-                  - config.weightB * countB * (1.0 + config.delta);
+        double cr = config.weightA * countA - config.weightB * countB * (1.0 + config.delta);
 
-        double cb = config.weightB * countB * (1.0 - config.delta)
-                  - config.weightA * countA;
+        double cb = config.weightB * countB * (1.0 - config.delta) - config.weightA * countA;
 
         if (cr > 0.0 || cb > 0.0)
             return false;
@@ -210,18 +203,12 @@ static bool isFairCounts2D(const vector<int> &counts,const unordered_map<string,
 
 
 
-optional<Result2D> bfsFair2D(
-    RawData2D &raw,
-    double qX_min,double qX_max,
-    double qY_min,double qY_max,
-    double alpha,double beta)
+optional<Result2D> bfsFair2D(RawData2D &raw,double qX_min,double qX_max,double qY_min,double qY_max,double alpha,double beta)
 {
     int n = static_cast<int>(raw.pts.size());
 
     if (n == 0)
         return nullopt;
-
-
 
     vector<double> xs;
     vector<double> ys;
@@ -385,11 +372,11 @@ optional<Result2D> bfsFair2D(
         }
     };
 
-
-
-    // Track the best fair rectangle found during the search.
-    // Do not return immediately on the first fair state, because a
-    // higher-similarity state may be generated later.
+    // Exact graph search over all reachable point-changing rectangles.
+    // We do NOT return on the first fair state. Similarity is not monotone
+    // along rectangle-neighbor transitions, so a later state may be better.
+    optional<Result2D> bestResult = nullopt;
+    double bestSimilarity = -1.0;
 
     while (!pq.empty())
     {
@@ -398,9 +385,11 @@ optional<Result2D> bfsFair2D(
 
         bool fair = isFairCounts2D(current.colorCounts,colorIndex);
 
-        if (fair)
+        if (fair && current.similarity > bestSimilarity)
         {
-            return Result2D{
+            bestSimilarity = current.similarity;
+
+            bestResult = Result2D{
                 xs[current.xl],
                 xs[current.xr],
                 ys[current.yl],
@@ -408,8 +397,10 @@ optional<Result2D> bfsFair2D(
                 current.similarity
             };
         }
+
         for (int dir = 0; dir < 8; ++dir)
             pushNextChangingNeighbor(current, dir);
     }
-    return nullopt;
+
+    return bestResult;
 }

@@ -27,11 +27,8 @@ static double tversky2D(int count_I, int count_O, int count_inter, double alpha,
 // 5. Reduce the Y search region using direct fairness checks.
 // 6. Build a KD-tree on fairness prefix points.
 // 7. Search for suitable fair Y intervals.
-optional<Result2D> queryBestKD_opt_2d(
-    RawData2D &raw,
-    double qX_min, double qX_max,
-    double qY_min, double qY_max,
-    double alpha, double beta) {
+optional<Result2D> queryBestKD_opt_2d(RawData2D &raw,double qX_min, double qX_max,double qY_min, double qY_max,double alpha, double beta) 
+{
 
     // Total number of points.
     int n_total = raw.pts.size();
@@ -168,11 +165,9 @@ optional<Result2D> queryBestKD_opt_2d(
             {
                 int cA = counts.count(config.colorA) ? counts.at(config.colorA) : 0;
                 int cB = counts.count(config.colorB) ? counts.at(config.colorB) : 0;
-
                 if (std::abs(config.weightA * cA - config.weightB * cB) > config.epsilon) 
                     return false;
             }
-
             // Check ratio-based constraints.
             for (const auto& config : ratioPairs) 
             {
@@ -182,12 +177,10 @@ optional<Result2D> queryBestKD_opt_2d(
                 // Upper ratio condition.
                 if (config.weightA * cA - config.weightB * cB * (1.0 + config.delta) > 0) 
                     return false;
-
                 // Lower ratio condition.
                 if (config.weightB * cB * (1.0 - config.delta) - config.weightA * cA > 0) 
                     return false;
             }
-
             return true;
         };
 
@@ -202,7 +195,6 @@ optional<Result2D> queryBestKD_opt_2d(
         while (Yend_prime < nY && !checkCountsFair(countsR)) 
         {
             Yend_prime++;
-
             if (Yend_prime < nY) 
             {
                 countsR[subY[Yend_prime].color]++;
@@ -223,7 +215,6 @@ optional<Result2D> queryBestKD_opt_2d(
         while (Ystart_prime >= 0 && !checkCountsFair(countsL)) 
         {
             Ystart_prime--;
-
             if (Ystart_prime >= 0) 
             {
                 countsL[subY[Ystart_prime].color]++;
@@ -456,36 +447,20 @@ optional<Result2D> queryBestKD_opt_2d(
     for (long long step = 1; step < n_total; step *= 2)
     {
         // Left boundary expansion and contraction.
-        leftCandidates.push_back(
-            max(0, qL_X - static_cast<int>(step))
-        );
-
-        leftCandidates.push_back(
-            min(qR_X, qL_X + static_cast<int>(step))
-        );
+        leftCandidates.push_back(max(0, qL_X - static_cast<int>(step)));
+        leftCandidates.push_back(min(qR_X, qL_X + static_cast<int>(step)));
 
         // Right boundary expansion and contraction.
-        rightCandidates.push_back(
-            min(n_total - 1, qR_X + static_cast<int>(step))
-        );
-
-        rightCandidates.push_back(
-            max(qL_X, qR_X - static_cast<int>(step))
-        );
+        rightCandidates.push_back(min(n_total - 1, qR_X + static_cast<int>(step)));
+        rightCandidates.push_back(max(qL_X, qR_X - static_cast<int>(step)));
     }
 
     // Sort and remove duplicate candidate boundaries.
     sort(leftCandidates.begin(), leftCandidates.end());
-    leftCandidates.erase(
-        unique(leftCandidates.begin(), leftCandidates.end()),
-        leftCandidates.end()
-    );
+    leftCandidates.erase(unique(leftCandidates.begin(), leftCandidates.end()),leftCandidates.end());
 
     sort(rightCandidates.begin(), rightCandidates.end());
-    rightCandidates.erase(
-        unique(rightCandidates.begin(), rightCandidates.end()),
-        rightCandidates.end()
-    );
+    rightCandidates.erase(unique(rightCandidates.begin(), rightCandidates.end()),rightCandidates.end());
 
     // Evaluate the original query X-range first.
     // This provides an initial feasible score for upper-bound pruning.

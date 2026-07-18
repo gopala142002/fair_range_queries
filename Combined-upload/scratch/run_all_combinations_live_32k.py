@@ -22,13 +22,13 @@ def main():
     all_modes = ["brute", "bfs"] + tree_modes
     
     combinations = [
-        (True, False, False),
-        (False, True, False),
+        # (True, False, False),
+        # (False, True, False),
         (False, False, True),
-        (True, True, False),
-        (True, False, True),
-        (False, True, True),
-        (True, True, True)
+        # (True, True, False),
+        # (True, False, True),
+        # (False, True, True),
+        # (True, True, True)
     ]
     
     # Load timestamps from dataset
@@ -44,7 +44,7 @@ def main():
     n_rows = len(timestamps)
 
     # Generate ranges
-    widths = [int(0.10 * n_rows)] * 3 + [int(0.30 * n_rows)] * 3 + [int(0.50 * n_rows)] * 3
+    widths = [int(0.10 * n_rows)] * 3 + [int(0.40 * n_rows)] * 3 + [int(0.80 * n_rows)] * 3
     queries = []
     for w in widths:
         start_idx = random.randint(0, n_rows - w)
@@ -54,14 +54,14 @@ def main():
         end_ts = timestamps[end_idx]
         
         if w == int(0.10 * n_rows): bucket = "small"
-        elif w == int(0.30 * n_rows): bucket = "medium"
+        elif w == int(0.40 * n_rows): bucket = "medium"
         else: bucket = "large"
             
         pos = "low" if start_idx < n_rows/3 else ("high" if start_idx > 2*n_rows/3 else "mid")
         
         queries.append({"start": start_ts, "end": end_ts, "bucket": bucket, "pos": pos, "width": w})
         
-    csv_filename = "scratch/combinations_result_live_32k.csv"
+    csv_filename = "scratch/combinations_result_live_32k_coverage_sim1.csv"
     
     # Columns to match synthetic_result.csv
     headers = [
@@ -117,7 +117,7 @@ def main():
                     for q in queries:
                         q_str = f"{q['start']} {q['end']} {alpha} {beta}"
                         if has_cov:
-                            q_str += f" 100 0 0"
+                            q_str += f" 2000 0 0"
                         input_lines.append(q_str)
                         
                     # End queries

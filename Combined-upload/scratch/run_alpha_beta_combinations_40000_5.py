@@ -31,14 +31,14 @@ def main():
     ]
     
     # Generate ranges
-    widths = [int(0.10 * n_rows)] * 3 + [int(0.30 * n_rows)] * 3 + [int(0.50 * n_rows)] * 3
+    widths = [int(0.10 * n_rows)] * 3 + [int(0.40 * n_rows)] * 3 + [int(0.80 * n_rows)] * 3
     queries = []
     for w in widths:
         start = random.randint(1, n_rows - w + 1)
         end = start + w - 1
         
         if w == int(0.10 * n_rows): bucket = "small"
-        elif w == int(0.30 * n_rows): bucket = "medium"
+        elif w == int(0.40 * n_rows): bucket = "medium"
         else: bucket = "large"
             
         pos = "low" if start < n_rows/3 else ("high" if start > 2*n_rows/3 else "mid")

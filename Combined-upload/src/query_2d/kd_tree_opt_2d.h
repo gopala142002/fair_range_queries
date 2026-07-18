@@ -1,6 +1,8 @@
 #pragma once
+
 #include "data_2d.h"
 #include "../trees/kd_tree.h"
+
 #include <optional>
 
 struct Result2D {
@@ -11,6 +13,10 @@ struct Result2D {
 
 std::optional<Result2D> queryBestKD_opt_2d(
     RawData2D &raw,
-    double qX_min, double qX_max,
-    double qY_min, double qY_max,
-    double alpha, double beta);
+    double qX_min,
+    double qX_max,
+    double qY_min,
+    double qY_max,
+    double alpha,
+    double beta
+);

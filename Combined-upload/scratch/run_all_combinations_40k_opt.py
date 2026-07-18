@@ -23,13 +23,13 @@ def main():
     all_modes = ["brute", "bfs"] + tree_modes
     
     combinations = [
-        (True, False, False),
-        (False, True, False),   
+        # (True, False, False),
+        # (False, True, False),   
         (False, False, True),
-        (True, True, False),
-        (True, False, True),
-        (False, True, True),
-        (True, True, True)
+        # (True, True, False),
+        # (True, False, True),
+        # (False, True, True),
+        # (True, True, True)
     ]
     
     # Generate ranges
@@ -51,7 +51,7 @@ def main():
         
         queries.append({"start": start, "end": end, "bucket": bucket, "pos": pos, "width": w})
         
-    csv_filename = "scratch/combinations_result_40k_opt.csv"
+    csv_filename = "scratch/combinations_result_40k_opt_coverage_sim1.csv"
     
     # Columns to match synthetic_result.csv
     headers = [
@@ -107,7 +107,7 @@ def main():
                     for q in queries:
                         q_str = f"{q['start']} {q['end']} {alpha} {beta}"
                         if has_cov:
-                            q_str += f" 0 0 0 100 0"
+                            q_str += f" 0 0 0 1000 0"
                         input_lines.append(q_str)
                         
                     # End queries

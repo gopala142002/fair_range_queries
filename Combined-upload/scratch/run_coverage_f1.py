@@ -38,7 +38,7 @@ def main():
     n_rows = len(timestamps)
 
     # Generate ranges
-    widths = [int(0.10 * n_rows)] * 3 + [int(0.30 * n_rows)] * 3 + [int(0.50 * n_rows)] * 3
+    widths = [int(0.10 * n_rows)] * 3 + [int(0.40 * n_rows)] * 3 + [int(0.80 * n_rows)] * 3
     queries = []
     for w in widths:
         start_idx = random.randint(0, n_rows - w)
@@ -48,7 +48,7 @@ def main():
         end_ts = timestamps[end_idx]
         
         if w == int(0.10 * n_rows): bucket = "small"
-        elif w == int(0.30 * n_rows): bucket = "medium"
+        elif w == int(0.40 * n_rows): bucket = "medium"
         else: bucket = "large"
             
         pos = "low" if start_idx < n_rows/3 else ("high" if start_idx > 2*n_rows/3 else "mid")

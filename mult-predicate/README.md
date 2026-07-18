@@ -8,7 +8,7 @@ Since Jaccard Similarity is a non-linear fractional objective, the problem is so
 
 ---
 
-## 📦 Datasets Used
+## Datasets Used
 
 The solvers are evaluated against a variety of real-world datasets spanning different dimensions and cardinalities:
 *   **NYC**: New York City spatial dataset (`NYC.csv`, `NYC_30k_5colors.txt`).
@@ -19,7 +19,7 @@ The solvers are evaluated against a variety of real-world datasets spanning diff
 
 ---
 
-## 📥 Input Data Format (`points.txt`)
+## Input Data Format (`points.txt`)
 
 The primary input coordinate and query boundary data must be formatted strictly in a structured text file (typically `points.txt` or similar). 
 
@@ -40,7 +40,7 @@ min_2 max_2      # Dim 2 Initial Query Box Bounds (min max)
 
 ---
 
-## ⚖️ Constraints Format (`constraints.txt`)
+## Constraints Format (`constraints.txt`)
 
 The fairness rules are passed externally via a text file (typically `constraints.txt`) and parsed by `parse_constraints.py`. The file defines pairwise differences, ratios, and coverage metrics across $N$ unique colors.
 
@@ -68,7 +68,7 @@ NaN NaN NaN
 
 ---
 
-## 🚀 Execution & Usage
+## Execution & Usage
 
 The solvers can be run directly from the command line using a Python 3 environment with `gurobipy` installed.
 
