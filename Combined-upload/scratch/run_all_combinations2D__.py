@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def main():
-    dataset = "live_l2_2d_30k.txt"
+    dataset = "live_l2_5D.txt"
     n_rows = 30000
     num_colors = "3"
 

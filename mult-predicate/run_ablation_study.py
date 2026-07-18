@@ -6,7 +6,7 @@ import numpy as np
 from itertools import combinations
 
 
-DATASET = "live_l2_5d_30k_with_color.txt"
+DATASET = "live_l2_5D.txt"
 DIMENSIONS = [2,3,4,5]
 NUM_QUERIES_PER_BUCKET = 1
 NUM_COLORS = 5

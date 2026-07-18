@@ -15,7 +15,7 @@ The solvers are evaluated against a variety of real-world datasets spanning diff
 *   **Gaia**: Astronomical dataset featuring star coordinates (`Gaia_30k_5colors.txt`, `dataGaia.csv`).
 *   **ACS (American Community Survey)**: Demographic dataset (`small_acs_3d_points.txt`).
 *   **Realtor**: Real estate listing coordinates (`realtor.txt`, `realtor_10000.txt`).
-*   **Live L2**: Custom/System dataset (`live_l2_5d_30k.txt`, `live_l2_shadow_30k.txt`).
+*   **Live L2**: Custom/System dataset (`live_l2_5d.txt`, `live_l2_shadow.txt`).
 
 ---
 

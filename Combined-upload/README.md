@@ -49,9 +49,9 @@ The project uses the following primary datasets for experimentation. Ensure thes
 
    - **Type:** Real-world Formula 1 dataset
    - **Colors:** 5 (HARD, MEDIUM, SOFT, INTERMEDIATE, WET)
-3. `data/live_l2_unique_32k.csv`
+3. `data/live_l2_1D.csv`
 
-   - **Type:** Live L2 Crypto Orderbook dataset (32,000 rows)
+   - **Type:** Live L2 Crypto Orderbook dataset
    - **Colors:** 3 (ETHUSDT, BTCUSDT, SOLUSDT)
 
 ## 4. HOW TO RUN
@@ -102,13 +102,13 @@ Available modes: `base`, `fair`, `fair_cov`
 **Using Make (Example with Live Crypto dataset):**
 
 ```bash
-make run_brute DATASET="data/live_l2_unique_32k.csv" COLORS=3 BRUTE_MODE="fair"
+make run_brute DATASET="data/live_l2_1D.csv" COLORS=3 BRUTE_MODE="fair"
 ```
 
 **Direct execution:**
 
 ```bash
-.\bin\main_brute_unified.exe data/live_l2_unique_32k.csv 3 fair
+.\bin\main_brute_unified.exe data/live_l2_1D.csv 3 fair
 ```
 
 > **NOTE:** Brute force is O(n^2) and is NOT bundled with tree/BFS/coverage executables. Use it independently on small ranges for correctness verification.
@@ -199,7 +199,7 @@ At the top of each script (inside the `main()` function), you can modify several
 Tests a wide variety of fairness constraint combinations (Difference only, Ratio only, Difference + Ratio, etc.) across tree search, BFS, and Brute Force methods.
 
 - `scratch/run_all_combinations_f1.py`
-- `scratch/run_all_combinations_live_32k.py`
+- `scratch/run_all_combinations_livel2.py`
 - `scratch/run_all_combinations_40k_opt.py`
 
 ### B. Alpha & Beta Combinations Scripts
@@ -208,7 +208,7 @@ Specifically designed to test how varying the `alpha` and `beta` parameters (Tve
 
 - `scratch/run_alpha_beta_combinations_40000_5.py`
 - `scratch/run_alpha_beta_combinations_f1.py`
-- `scratch/run_alpha_beta_combinations_live_32k.py`
+- `scratch/run_alpha_beta_combinations_livel2.py`
 
 ### C. Coverage Combination Scripts
 
@@ -216,12 +216,12 @@ Focuses primarily on Coverage constraints, evaluating how different coverage per
 
 - `scratch/run_coverage_40k_opt.py`
 - `scratch/run_coverage_f1.py`
-- `scratch/run_coverage_live_32k.py`
+- `scratch/run_coverage_livel2.py`
 
 ### Tracking Execution Progress
 
 Because these scripts evaluate thousands of combinations, execution can be lengthy. Progress is tracked incrementally in the console.
-Additionally, scripts designated with `_progress` (like `scratch/run_all_combinations_live_32k_progress.py`) are designed to output periodic updates and incrementally append results to their respective output files (e.g. `combinations_result_live_32k_progress.csv`), allowing you to monitor results in real time.
+Additionally, scripts designated with `_progress` (like `scratch/run_all_combinations_livel2_progress.py`) are designed to output periodic updates and incrementally append results to their respective output files (e.g. `combinations_result_livel2_progress.csv`), allowing you to monitor results in real time.
 
 ## 9. PLOTTING RESULTS
 The `Exp_clean/` directory contains Python scripts to generate graphs from the CSV results produced by the experiment scripts. All plots will be saved as PNG images in the same directory as the input CSV file.

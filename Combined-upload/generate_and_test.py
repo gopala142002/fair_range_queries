@@ -4,7 +4,7 @@ import time
 import sys
 
 def main():
-    test_file = "data/live_l2_5d_30k.txt"
+    test_file = "data/live_l2_5D.txt"
     exe_ext = ".exe" if sys.platform == "win32" else ""
     
     queries = [
