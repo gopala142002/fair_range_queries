@@ -11,10 +11,11 @@ Since Jaccard Similarity is a non-linear fractional objective, the problem is so
 ## Datasets Used
 
 The solvers are evaluated against a variety of real-world datasets spanning different dimensions and cardinalities:
-*   **NYC**: New York City spatial dataset (`NYC.csv`, `NYC_30k_5colors.txt`).
+<!-- *   **NYC**: New York City spatial dataset (`NYC.csv`, `NYC_30k_5colors.txt`).
 *   **Gaia**: Astronomical dataset featuring star coordinates (`Gaia_30k_5colors.txt`, `dataGaia.csv`).
 *   **ACS (American Community Survey)**: Demographic dataset (`small_acs_3d_points.txt`).
-*   **Realtor**: Real estate listing coordinates (`realtor.txt`, `realtor_10000.txt`).
+*   **Realtor**: Real estate listing coordinates (`realtor.txt`, `realtor_10000.txt`). -->
+*   **Synthetic**: Synthetic dataset (`synthetic_4d.cav`)
 *   **Live L2**: Custom/System dataset (`live_l2_5d.txt`, `live_l2_shadow.txt`).
 
 ---
