@@ -16,7 +16,7 @@ Together, these components provide both algorithmic and optimization-based appro
 
 ```text
 .
-├── Combined-upload/      # Algorithms and experiment framework
+├── Single-predicate/      # Algorithms and experiment framework
 ├── mult-predicate/       # ILP solvers
 └── README.md             # This file
 ```
